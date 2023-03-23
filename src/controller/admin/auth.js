@@ -1,10 +1,10 @@
-const User = require('../../models/user');
+const Admin = require('../../models/admin');
 const jwt = require('jsonwebtoken');
 exports.signup=(req, res ) =>
 {
-    User.findOne({ email: req.body.email})
-    .exec((error,user) => {
-        if(user) return res.status(400).json({
+    Admin.findOne({ email: req.body.email})
+    .exec((error,admin) => {
+        if(admin) return res.status(400).json({
         message: 'Admin already registered'
      });
 
@@ -16,18 +16,19 @@ exports.signup=(req, res ) =>
 
      } = req.body;
 
-     const _user = new User({
+     const _admin = new Admin({
         firstName ,
         lastName , 
         email, 
         password,
-        username: Math.random().toString(),
+        adminname: Math.random().toString(),
         role:'admin'
     });
-    _user.save((error , data)=>{
+    _admin.save((error , data)=>{
         if(error){
             return res.status(400).json({
-                message: 'User could not be registered...Something went wrong'
+                message: 'Admin could not be registered...Something went wrong',
+                error
             });
         }
         if(data)
@@ -40,16 +41,16 @@ exports.signup=(req, res ) =>
     });
 }
 exports.signin = (req , res ) => {
-    User.findOne({email: req.body.email})
-    .exec((error, user) => {
+    Admin.findOne({email: req.body.email})
+    .exec((error, admin) => {
         if (error) return res.status(400).json({error});
-        if(user){
-           if(user.authenticate(req.body.password) && user.role === 'admin'){
-             const token = jwt.sign({id:user._id}, process.env.JWT_SECRET,{expiresIn:'1h'}); 
-             const {_id ,firstName,lastName,email,role,fullName} = user;
+        if(admin){
+           if(admin.authenticate(req.body.password) && admin.role === 'admin'){
+             const token = jwt.sign({id:admin._id}, process.env.JWT_SECRET,{expiresIn:'1h'}); 
+             const {_id ,firstName,lastName,email,role,fullName} = admin;
              res.status(200).json({
                 token,
-                user: {
+                admin: {
                    _id, firstName,lastName,email,role,fullName
                 }
              });
@@ -69,8 +70,8 @@ exports.requireSignin = (req , res , next) =>
 
    // console.log(token);
     // const  jwt.decode(token,process.JWT_SECRET);
-    const user = jwt.verify(token, process.JWT_SECRET);
-    req.user= user;
+    const admin = jwt.verify(token, process.JWT_SECRET);
+    req.admin= admin;
     next();
     //jwt.decode()
 }

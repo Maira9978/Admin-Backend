@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Topic = require('../models/topic');
 const Question = require("../models/question");
-
+const User = require('../models/user');
+const mongoose = require('mongoose');
 
 router.get('/viewTopic',(req, res)=>{
     Topic.find().exec((error, topic)=> {
@@ -45,9 +46,18 @@ router.post('/addTopic',(req, res) =>{
         }
         if(data)
         {
+
+          const updateUsers = { $push: { personalTopics: data } }; // update to be applied
+
+          User.updateMany({}, updateUsers, function(err, result) {
+            if (err) throw err;
+            console.log(`${result.modifiedCount} records updated`);
             return res.status(200).json({
-                topic:data
-            })
+              topic:data,
+              result
+          })
+          });
+   
         }
       });
     });
@@ -71,6 +81,15 @@ router.delete('/deleteTopic/:id', (req, res) => {
               });
             }
 
+          });
+         
+          let topic_id=mongoose.Types.ObjectId(id);
+        const updateUsers = { $pull: { personalTopics: { _id: topic_id } } }; // update to be applied
+        console.log("going to del: ",updateUsers)
+          User.updateMany({}, updateUsers, function(err, result) {
+            if (err) throw err;
+            console.log(`${result.modifiedCount} records updated`);
+            console.log(result);
           });
 
         return res.status(200).json({
