@@ -41,6 +41,7 @@ exports.signup=(req, res ) =>
     });
 }
 exports.signin = (req , res ) => {
+    console.log(req.body.email)
     Admin.findOne({email: req.body.email})
     .exec((error, admin) => {
         if (error) return res.status(400).json({error});
@@ -50,7 +51,7 @@ exports.signin = (req , res ) => {
              const {_id ,firstName,lastName,email,role,fullName} = admin;
              res.status(200).json({
                 token,
-                admin: {
+                user: {
                    _id, firstName,lastName,email,role,fullName
                 }
              });

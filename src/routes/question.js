@@ -10,6 +10,7 @@ const axios = require("axios");
 
 
 
+
 router.get('/viewquestion',(req, res)=>{
   Question.find().exec((error, question)=> {
       if(error){
@@ -26,20 +27,35 @@ router.get('/viewquestion',(req, res)=>{
   })
 });
 
-router.post("/addQuestion", (req, res) => {
-  const x = Topic.findOne({ tName: req.body["topic"] })
-    .then((topic) => {
-      req.body["topic"] = topic._id.valueOf();
+router.post('/addQuestion', (req, res) => {
+  const { topic, difficulty, category, questionContent, options, correctAnswer } = req.body;
+  
+  if (!topic || !difficulty || !category || !questionContent || !options || !correctAnswer) {
+    return res.status(400).json({ message: "All fields are required" });
+  }
+  
+  const newQuestion = new Question({
+    topic,
+    difficulty,
+    category,
+    questionContent,
+    options,
+    correctAnswer
+  });
 
-      const ques = Question.insert(req.body);
-
-      if (ques)
-        return res.status(201).json({
-          message: "Questions has added",
-          Questions: ques,
-        });
-    })
-    .catch((err) => console.log(err));
+  newQuestion.save((error, question) => {
+    if (error) {
+      return res.status(400).json({
+        message: "Error in adding question",
+        error: error
+      });
+    } else {
+      return res.status(200).json({
+        message: "Question added successfully",
+        question: question
+      });
+    }
+  });
 });
 
 router.get("/selectFile", (req, res) => {
@@ -62,7 +78,6 @@ router.post("/Parser", (req, res) => {
         raw = removeEmptyLines(raw);
         // Split data by lines
         const data = raw.split("\n");
-
         const headers = [
         "topic",
         "difficulty",
@@ -81,7 +96,8 @@ router.post("/Parser", (req, res) => {
         // Split data line on cells
         const quesProp = data[i].split(",").map((s) =>s.trim());
         // Checking if any property of question missing
-        if (quesProp.length < 3 || i + 2 >= data.length) {
+        console.log(quesProp)
+        if ((quesProp.length < 3) || (i + 2 >= data.length)) {
             console.log("Issue in any of the Question Properties");
             continue;
         }
@@ -283,40 +299,61 @@ router.delete('/deleteQuestion/:id', (req, res) => {
           }
 
         });
-
+*/
       return res.status(200).json({
         message: 'Question deleted successfully',
-      }); */
+      }); 
     }
     });
 });
 
-router.put("/editQuestion/:id", async (req, res) => {
+
+
+router.put('/editQuestion/:id', async (req, res) => {
+  const { questionContent, topic, category, difficulty } = req.body;
   try {
     const question = await Question.findById(req.params.id);
-
-    // Check if the question exists
+    console.log(questionContent)
     if (!question) {
       return res.status(404).json({ message: "Question not found" });
     }
-
-    // Update the question properties
-    question.questionContent = req.body.questionContent;
-    question.category = req.body.category;
-    question.topic = req.body.topic;
-
-    // Save the updated question
+    if (questionContent) {
+      
+      question.questionContent = questionContent;
+    }
+    
+    console.log(topic, "this is")
+    if (topic) {
+      const topicObj = await Topic.findOne({ _id: topic });
+      if (!topicObj) {
+        console.log("Topic not found")
+        return res.status(404).json({ message: "Topic not found" });
+      }
+      question.topic = topicObj._id.valueOf();
+    }
+    if (category) {
+      const categoryObj = await Category.findOne({ _id: category });
+      if (!categoryObj) {
+        console.log("Category not found")
+        return res.status(404).json({ message: "Category not found" });
+      }
+      question.category = categoryObj._id.valueOf();
+    }
+    if (difficulty) {
+      const difficultyObj = await Difficulty.findOne({ _id: difficulty });
+      if (!difficultyObj) {
+        console.log("Difficulty not found")
+        return res.status(404).json({ message: "Difficulty not found" });
+      }
+      question.difficulty = difficultyObj._id.valueOf();
+    }
+    
     await question.save();
-
-    return res.status(200).json({
-      message: "Question updated successfully",
-      question,
-    });
+    return res.status(200).json({ message: "Question updated successfully" });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ message: "Error updating question" });
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 });
-
 
 module.exports = router;
