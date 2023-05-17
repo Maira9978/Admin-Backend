@@ -1,12 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const Question = require("../models/question");
+const Result = require("../models/result")
 const Topic = require("../models/topic");
 const Difficulty = require("../models/difficulty");
 const Category = require("../models/category");
 const path = require("path");
 const axios = require("axios");
-
+const User=require("../models/user");
+const multiplayerResults=require("../models/multiplayerResult")
 
 
 
@@ -45,10 +47,8 @@ router.post('/addQuestion', (req, res) => {
 
   newQuestion.save((error, question) => {
     if (error) {
-      return res.status(400).json({
-        message: "Error in adding question",
-        error: error
-      });
+      console.error("Error in adding question:", error);
+      return res.status(400).json({ message: "Error in adding question" });
     } else {
       return res.status(200).json({
         message: "Question added successfully",
@@ -58,203 +58,202 @@ router.post('/addQuestion', (req, res) => {
   });
 });
 
+
 router.get("/selectFile", (req, res) => {
   let ind = path.join(__dirname, "..", "views", "index.html");
   res.sendFile(ind);
 });
 
-router.post("/Parser", (req, res) => {
-  console.log("Its Called..");
+router.post("/parser", (req, res) => {
+  console.log("It's Called..");
   if (req.files) {
-        console.log("File Selected");
-        var temp = req.files.myFile.data;
+    console.log("File Selected");
+    var temp = req.files.myFile.data;
 
-        const removeEmptyLines = (str) =>
-        str
-            .split(/\r?\n/)
-            .filter((line) => line.trim() !== "")
-            .join("\n");
-        var raw = temp.toString();
-        raw = removeEmptyLines(raw);
-        // Split data by lines
-        const data = raw.split("\n");
-        const headers = [
-        "topic",
-        "difficulty",
-        "category",
-        "questionContent",
-        "options",
-        "correctAnswer",
-        ];
-        // Define target JSON array
-        let json = [];
+    const removeEmptyLines = (str) =>
+      str.split(/\r?\n/).filter((line) => line.trim() !== "").join("\n");
+    var raw = temp.toString();
+    raw = removeEmptyLines(raw);
+    // Split data by lines
+    const data = raw.split("\n");
+    const headers = [
+      "topic",
+      "difficulty",
+      "category",
+      "questionContent",
+      "options",
+      "correctAnswer",
+    ];
+    // Define target JSON array
+    let json = [];
 
-        // // Loop data
-        for (let i = 0; i < data.length; i++) {
-        // Remove empty lines
-        if (/^\s*$/.test(data[i])) continue;
-        // Split data line on cells
-        const quesProp = data[i].split(",").map((s) =>s.trim());
-        // Checking if any property of question missing
-        console.log(quesProp)
-        if ((quesProp.length < 3) || (i + 2 >= data.length)) {
-            console.log("Issue in any of the Question Properties");
-            continue;
-        }
-        // Checking if the Question-content in right format
-        if (data[i + 1][1]=='.' || data[i + 1][2]=='.') {
-            console.log("Issue in any of the Question-Content");
-            continue;
-        }
-        const quesContent = data[i + 1].trim();
-        var quesAns = "";
-        var totalOpts=0;
-        var quesOpts=[];
-        while(data[i + 2+ totalOpts][1]=='.' || data[i + 2 + totalOpts][2]=='.'){
-          if(data[i + 2+ totalOpts][0]=='*'){
+    // Loop data
+    for (let i = 0; i < data.length; i++) {
+      // Remove empty lines
+      if (/^\s*$/.test(data[i])) continue;
+      // Split data line on cells
+      const quesProp = data[i].split(",").map((s) => s.trim());
+      // Checking if any property of question missing
+      console.log(quesProp);
+      if (quesProp.length < 3 || i + 2 >= data.length) {
+        console.log("Issue in any of the Question Properties");
+        return res.status(400).json({ message: "Invalid question properties" });
+      }
+      // Checking if the Question-content in the right format
+      if (data[i + 1][1] === "." || data[i + 1][2] === ".") {
+        console.log("Issue in any of the Question-Content");
+        return res
+          .status(400)
+          .json({ message: "Invalid question content format" });
+      }
+      const quesContent = data[i + 1].trim();
+      var quesAns = "";
+      var totalOpts = 0;
+      var quesOpts = [];
+      while (
+        data[i + 2 + totalOpts][1] === "." ||
+        data[i + 2 + totalOpts][2] === "."
+      ) {
+        if (data[i + 2 + totalOpts][0] === "*") {
+          var tmp = data[i + 2 + totalOpts].split("");
+          tmp.splice(0, 3);
+          data[i + 2 + totalOpts] = tmp.join("").trim();
 
-            var tmp = data[i + 2+ totalOpts].split("");
-            tmp.splice(0, 3);
-            data[i + 2+ totalOpts] = tmp.join("").trim();
-
-            quesAns = data[i + 2+ totalOpts];
-            quesOpts.push(quesAns);
-            totalOpts++;
-            if((i + 2+ totalOpts)>=data.length){
-              break;
-            }
-            continue;
-          }
-          var tmp = data[i + 2+ totalOpts].split("");
-            tmp.splice(0, 2);
-            data[i + 2+ totalOpts] = tmp.join("").trim();
-            quesOpts.push( data[i + 2+ totalOpts]);
-
+          quesAns = data[i + 2 + totalOpts];
+          quesOpts.push(quesAns);
           totalOpts++;
-          if((i + 2+ totalOpts)>=data.length){
+          if (i + 2 + totalOpts >= data.length) {
             break;
           }
+          continue;
         }
+        var tmp = data[i + 2 + totalOpts].split("");
+        tmp.splice(0, 2);
+        data[i + 2 + totalOpts] = tmp.join("").trim();
+        quesOpts.push(data[i + 2 + totalOpts]);
 
-        // var quesOpts = data[i + 2].split("|").map((s) => s.trim());
-        if (quesOpts.length < 2) {
-            console.log("Issue in any of the Question Option");
-            continue;
+        totalOpts++;
+        if (i + 2 + totalOpts >= data.length) {
+          break;
         }
-        
+      }
 
-        // for (let i = 0; i < quesOpts.length; i++) {
-        //     // Searching for the Answer (having *- at the start)
-        //     if (quesOpts[i][0] == "*" && quesOpts[i][1] == "-") {
-        //     // Removing and Answer identification and storing it in Answer
-        //     var tmp = quesOpts[i].split("");
-        //     tmp.splice(0, 2);
-        //     quesOpts[i] = tmp.join("").trim();
+      if (quesOpts.length < 2) {
+        console.log("Issue in any of the Question Option");
+        return res
+          .status(400)
+          .json({ message: "Invalid question options format" });
+      }
 
-        //     quesAns = quesOpts[i];
-        //     break;
-        //     }
-        // }
-        // // Loop cells
-        let jsonLine = {};
-        for (let i = 0; i < quesProp.length; i++)
-            jsonLine[headers[i]] = quesProp[i].toLowerCase();
+      let jsonLine = {};
+      for (let i = 0; i < quesProp.length; i++)
+        jsonLine[headers[i]] = quesProp[i].toLowerCase();
 
-        jsonLine[headers[quesProp.length]] = quesContent;
+      jsonLine[headers[quesProp.length]] = quesContent;
+      jsonLine[headers[quesProp.length + 1]] = quesOpts;
 
-        jsonLine[headers[quesProp.length + 1]] = quesOpts;
+      jsonLine[headers[quesProp.length + 2]] = quesAns;
+    
+      json.push(jsonLine);
+      i = i + 1 + quesOpts.length;
+    }
+    
+    console.log("Going to Upload on Database:", json);
+    axios
+      .post("http://localhost:2000/api/uploadQuesList", {
+        quesList: json,
+      })
+      .then((response) => {
+        return res.status(200).json({
+          message: response.data.body,
+        });
+      })
+      .catch((error) => {
+        console.log(error);
+        return res.status(500).json({ message: "Internal server error" });
+      });
+    } else {
+      return res.status(400).json({ message: "File could not be uploaded" });
+      }
+      });    
 
-        jsonLine[headers[quesProp.length + 2]] = quesAns;
 
-        // // Push new line to json array
-        json.push(jsonLine);
-        i = i + 1+ quesOpts.length;
-        }
-
-        // Result
-        console.log("Going to Upload on Database:",json);
-        axios
-        .post("http://localhost:2000/api/uploadQuesList", {
-            quesList: json,
-        })
-        // Print response
-        .then((response) => {
-            return res.status(200).json({
-            Message: response.data.body,
-            });
-        })
-        // Print error message if occur
-        .catch((error) => console.log(error));
-  }
-  else{
-    return res.status(400).json({ message: "File could not be Uploaded" });
-  }
-     
-});
-
-router.post("/uploadQuesList", (req, res) => {
-  console.log(req.body.quesList);
-  for (const ques in req.body.quesList) {
-    // Replacing the 'Name' of Topic with it's ID
-    Topic.findOne({ tName: req.body.quesList[ques].topic })
-      .then((topic) => {
-        if (topic) {
-          req.body.quesList[ques].topic = topic._id;
-
-          // Replacing the 'Name' of Difficulty-level with it's ID
-          Difficulty.findOne({ dName: req.body.quesList[ques].difficulty })
-            .then((difficulty) => {
-              if (difficulty) {
-                req.body.quesList[ques].difficulty = difficulty._id;
-
-                // Replacing the 'Name' of Category with it's ID
-                console.log("Searching  a: ", req.body.quesList[ques].category);
-                Category.findOne({ cName: req.body.quesList[ques].category })
-                  .then((category) => {
-                    if (category) {
-                      req.body.quesList[ques].category = category._id;
-
-                      // Adding the Question to Database
-                      Question.create(
-                        req.body.quesList[ques],
-                        function (err, res) {
-                          if (err) throw err;
-                          console.log("Ques added:", res);
-                        }
-                      );
+      router.post("/uploadQuesList", (req, res) => {
+        console.log(req.body.quesList);
+        const errorMessages = [];
+      
+        const promises = req.body.quesList.map((ques) => {
+          return Topic.findOne({ tName: ques.topic })
+            .then((topic) => {
+              if (topic) {
+                ques.topic = topic._id;
+                return Difficulty.findOne({ dName: ques.difficulty })
+                  .then((difficulty) => {
+                    if (difficulty) {
+                      ques.difficulty = difficulty._id;
+                      return Category.findOne({ cName: ques.category })
+                        .then((category) => {
+                          if (category) {
+                            ques.category = category._id;
+                            return Question.create(ques)
+                              .then((createdQuestion) => {
+                                console.log("Ques added:", createdQuestion);
+                              })
+                              .catch((err) => {
+                                console.log("Error From adding question: ", err);
+                                errorMessages.push(err.message);
+                              });
+                          } else {
+                            console.log("Given Category not found in Database");
+                            errorMessages.push("Given Category not found in Database");
+                          }
+                        })
+                        .catch((err) => {
+                          console.log("Error From adding Category in ques: ", err);
+                          errorMessages.push(err.message);
+                        });
                     } else {
-                      console.log("Given Category not found in Database");
+                      console.log("Given Difficulty-level not found in Database");
+                      errorMessages.push("Given Difficulty-level not found in Database");
                     }
                   })
-                  .catch((err) =>
-                    console.log(
-                      "Error From adding Category in ques.......",
-                      err
-                    )
-                  );
+                  .catch((err) => {
+                    console.log("Error From adding diff-level in ques: ", err);
+                    errorMessages.push(err.message);
+                  });
               } else {
-                console.log("Given Difficulty-level not found in Database");
+                console.log("Given Topic not found in Database");
+                errorMessages.push("Given Topic not found in Database");
               }
             })
-            .catch((err) =>
-              console.log("Error From adding diff-level in ques.......", err)
-            );
-        } else {
-          console.log("Given Topic "+req.body.quesList[ques].topic +" not found in Database");
-        }
-      })
-      .catch((err) =>
-        console.log("Error From adding topic in ques.......", err)
-      );
-  }
-  // Storing list of all Questions in Database
-  // const ques=  Question.insertMany(req.body);
-  // if(ques)
-  return res.status(201).json({
-    message: "Questions has added",
-    // Questions: ques
-  });
-});
+            .catch((err) => {
+              console.log("Error From adding topic in ques: ", err);
+              errorMessages.push(err.message);
+            });
+        });
+      
+        Promise.all(promises)
+          .then(() => {
+            if (errorMessages.length > 0) {
+              return res.status(400).json({
+                message: "Error in adding questions",
+                errors: errorMessages
+              });
+            } else {
+              return res.status(201).json({
+                message: "Questions added successfully"
+              });
+            }
+          })
+          .catch((err) => {
+            console.log("Error while processing questions: ", err);
+            return res.status(500).json({
+              message: "Internal Server Error"
+            });
+          });
+      });
+      
+      
 
 router.get('/searchQuestion', (req, res) => {
   const searchQuery = req.query.q;
@@ -307,7 +306,25 @@ router.delete('/deleteQuestion/:id', (req, res) => {
     });
 });
 
+router.get('/questionstopics', async (req, res) => {
+  try {
+    // Find all questions and populate the "topic" field
+    const questions = await Question.find().populate('topic');
 
+    // Count the total questions for each topic
+    const topicCounts = {};
+
+    questions.forEach((question) => {
+      const topicName = question.topic.tName;
+      topicCounts[topicName] = (topicCounts[topicName] || 0) + 1;
+    });
+
+    res.json(topicCounts);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 router.put('/editQuestion/:id', async (req, res) => {
   const { questionContent, topic, category, difficulty } = req.body;
@@ -355,5 +372,174 @@ router.put('/editQuestion/:id', async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 });
+//easy , medium , hard there questions and correct and incorrect
+router.get("/question-stats", async(req, res) => {
+  try {
+    const stats = await Result.aggregate([
+      {
+        $unwind: "$Options_Res"
+      },
+      {
+        $lookup: {
+          from: "difficulties",
+          localField: "Options_Res.difficulty",
+          foreignField: "_id",
+          as: "difficulty"
+        }
+      },
+      {
+        $unwind: "$difficulty"
+      },
+      {
+        $group: {
+          _id: "$Options_Res.difficulty",
+          correct: {
+            $sum: {
+              $cond: [
+                { $eq: ["$Options_Res.IsCorrect", true] },
+                1,
+                0
+              ]
+            }
+          },
+          incorrect: {
+            $sum: {
+              $cond: [
+                { $eq: ["$Options_Res.IsCorrect", false] },
+                1,
+                0
+              ]
+            }
+          },
+          total: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: "difficulties",
+          localField: "_id",
+          foreignField: "_id",
+          as: "difficulty"
+        }
+      },
+      {
+        $unwind: "$difficulty"
+      },
+      {
+        $project: {
+          _id: 0,
+          difficulty: "$difficulty.dName",
+          correct: 1,
+          incorrect: 1,
+          total: 1
+        }
+      }
+    ]);
 
+    const statsObj = {};
+    stats.forEach(stat => {
+      statsObj[stat.difficulty] = {
+        correct: stat.correct,
+        incorrect: stat.incorrect,
+        total: stat.total
+      };
+    });
+
+    res.json(statsObj);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server Error' });
+    }
+  });
+router.get('/multiplayerMatchResults', async (req, res) => {
+  try {
+    const users = await User.find();
+    const playerResults = {};
+
+    await Promise.all(users.map(async (user) => {
+      const playerId = user._id;
+      const playerName = user.firstName; // Assuming the player name field is 'name'
+
+      try {
+        const results = await multiplayerResults.aggregate([
+          { $match: { 'players': { $elemMatch: { [playerId]: { $exists: true } } } } },
+          {
+            $group: {
+              _id: playerName, // Group by player name
+              gamesWon: {
+                $sum: {
+                  $cond: {
+                    if: {
+                      $and: [
+                        { $eq: ['$winner', playerId] }
+                      ]
+                    },
+                    then: 1,
+                    else: 0
+                  }
+                }
+              },
+              gamesLost: {
+                $sum: {
+                  $cond: {
+                    if: {
+                      $and: [
+                        { $ne: ['$winner', playerId] }
+                      ]
+                    },
+                    then: 1,
+                    else: 0
+                  }
+                }
+              },
+              totalGames: { $sum: 1 }
+            }
+          },
+          { $project: { _id: 0, playerName: '$_id', gamesWon: 1, gamesLost: 1, totalGames: 1 } } // Include playerName field in the projection
+        ]);
+
+        playerResults[playerName] = results;
+      } catch (err) {
+        console.error(err);
+        res.status(500).send('Error retrieving results');
+      }
+    }));
+
+    res.json(playerResults);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error retrieving results');
+  }
+});
+
+router.get('/playerScores', async (req, res) => {
+
+  Result.aggregate([
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'player',
+        foreignField: '_id',
+        as: 'user'
+      }
+    },
+    {
+      $unwind: '$user'
+    },
+    {
+      $group: {
+        _id: '$player',
+        playerName: { $first: '$user.firstName' },
+        scores: { $push: '$Total_Score' }
+      }
+    }
+  ]).exec()
+  .then((result) => {
+    return res.status(200).json(result);
+  })
+  .catch((error) => {
+    return res.status(400).json(error );
+  });
+
+});
 module.exports = router;

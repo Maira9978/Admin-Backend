@@ -102,25 +102,35 @@ router.get("/friends/:userId", async (req, res) => {
     }
   });
 
-  router.get("/users", async (req, res) => {
-    try {
-      User.find().exec((error, user)=> {
+
+ /*  router.get('/viewquestion',(req, res)=>{
+    Question.find().exec((error, question)=> {
         if(error){
             return res.status(400).json({
-                message: "Error in Displaying Users",
+                message: "Error in Displaying question",
                 Err: error
             });
         }
         else{
-            return res.status(200).json(user)
+            return res.status(200).json({
+                question
+            })
         }
+    })
+  }); */
+  router.get("/users", (req, res) => {
+    User.find().exec((error, users) => {
+      if (error) {
+        return res.status(400).json({
+          message: "Error in displaying users",
+          error: error
+        });
+      } else {
+        return res.status(200).json(users);
+      }
     });
-    }
-    catch (err) {
-      res.status(500).json(err);
-    }
   });
-
+  
 
   router.put("/:id/edit", async (req, res) => {
     User.findOneAndUpdate(

@@ -22,46 +22,46 @@ router.get('/viewTopic',(req, res)=>{
 });
 
 
-router.post('/addTopic',(req, res) =>{
-   
-    req.body.tName=req.body.tName.toLowerCase();
-    Topic.findOne({ tName: req.body.tName})
-    .exec((error,topic) => {
-        if(topic) return res.status(400).json({
-        message: 'Given Topic already added'
-     });
-     const {
-        tName
-     } = req.body;
-     console.log("Sent request of topic: "+ req.body.tName);
-     const _topic = new Topic({
-        tName
-    });
-    _topic.save((error , data)=>{
-        if(error){
-            return res.status(400).json({
-                message: 'Topic could not be added...Something went wrong',
-                e:error
-            });
-        }
-        if(data)
-        {
-
-          const updateUsers = { $push: { personalTopics: data } }; // update to be applied
-
-          User.updateMany({}, updateUsers, function(err, result) {
-            if (err) throw err;
-            console.log(`${result.modifiedCount} records updated`);
-            return res.status(200).json({
-              topic:data,
-              result
-          })
-          });
-   
-        }
+router.post('/addTopic', (req, res) => {
+  req.body.tName = req.body.tName.toLowerCase();
+  
+  Topic.findOne({ tName: req.body.tName }).exec((error, topic) => {
+    if (topic) {
+      return res.status(400).json({
+        message: 'Given Topic already exists'
       });
+    }
+
+    const { tName } = req.body;
+    console.log("Sent request of topic: " + req.body.tName);
+    const _topic = new Topic({
+      tName
     });
+
+    _topic.save((error, data) => {
+      if (error) {
+        return res.status(400).json({
+          message: 'Topic could not be added. Something went wrong.',
+          error: error.message
+        });
+      }
+
+      if (data) {
+        const updateUsers = { $push: { personalTopics: data } }; // update to be applied
+
+        User.updateMany({}, updateUsers, function (err, result) {
+          if (err) throw err;
+          console.log(`${result.modifiedCount} records updated`);
+          return res.status(200).json({
+            topic: data,
+            result
+          });
+        });
+      }
+    });
+  });
 });
+
 router.delete('/deleteTopic/:id', (req, res) => {
     const id = req.params.id;
     Topic.findByIdAndRemove(id, (error, data) => {
